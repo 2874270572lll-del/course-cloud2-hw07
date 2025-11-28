@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    # 关键修改：localhost → 主机的IPv4地址（如192.168.1.105，替换为你主机的实际IP）
+    url: jdbc:mysql://192.168.255.1:3306/coursehub?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&enabledTLSProtocols=TLSv1.2
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: lilili2004  # 已正确配置为主机MySQL的账号
+    password: lilili2004  # 已正确配置为主机MySQL的密码
+    # Hikari连接池配置（无需修改）
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      continue-on-error: true
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    root: INFO

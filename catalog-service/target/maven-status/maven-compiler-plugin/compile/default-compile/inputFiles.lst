@@ -1,0 +1,11 @@
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/Course2Application.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/common/ApiResponse.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/common/GlobalExceptionHandler.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/controller/CourseController.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/controller/HealthController.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/controller/TestController.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/model/Course.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/model/Instructor.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/model/ScheduleSlot.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/repository/CourseRepository.java
+/home/li/weifuwu/course-cloud2/catalog-service/src/main/java/com/zjgsu/lll/course2_new/service/CourseService.java

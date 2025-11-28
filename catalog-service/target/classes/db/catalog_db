@@ -1,0 +1,7 @@
+-- 创建数据库
+CREATE DATABASE IF NOT EXISTS catalog_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 创建用户并授权
+CREATE USER IF NOT EXISTS 'catalog_user'@'%' IDENTIFIED BY 'catalog_pass';
+GRANT ALL PRIVILEGES ON catalog_db.* TO 'catalog_user'@'%';
+FLUSH PRIVILEGES;

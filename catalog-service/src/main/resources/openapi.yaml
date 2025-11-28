@@ -1,0 +1,674 @@
+openapi: 3.0.3
+info:
+  title: 校园选课系统 API (v1.1.0)
+  description: 基于 Spring Boot + Spring Data JPA 的课程、学生、选课管理系统（数据库持久化版本）
+  version: 1.1.0
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境（支持 H2/MySQL 多环境切换）
+components:
+  schemas:
+    # 通用响应格式（完全匹配 ApiResponse.java）
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 响应状态码（200=成功，400=参数错误，404=资源不存在，500=服务器错误）
+          example: 200
+        message:
+          type: string
+          description: 响应描述信息
+          example: Success
+        data:
+          type: object
+          description: 响应数据（根据接口动态返回）
+      required:
+        - code
+        - message
+
+    # 讲师嵌入式对象（匹配 Instructor.java）
+    Instructor:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 讲师ID
+          example: "INS001"
+          maxLength: 20
+        name:
+          type: string
+          description: 讲师姓名
+          example: "李教授"
+          maxLength: 50
+        email:
+          type: string
+          description: 讲师邮箱
+          example: "li@zjgsu.edu.cn"
+          maxLength: 100
+
+    # 排课嵌入式对象（匹配 ScheduleSlot.java）
+    ScheduleSlot:
+      type: object
+      properties:
+        dayOfWeek:
+          type: string
+          description: 上课星期（如 Monday/Tuesday 或 周一/周二）
+          example: "Monday"
+          maxLength: 20
+        startTime:
+          type: string
+          description: 开始时间（格式：HH:mm）
+          example: "09:00"
+          maxLength: 10
+        endTime:
+          type: string
+          description: 结束时间（格式：HH:mm）
+          example: "11:30"
+          maxLength: 10
+        expectedAttendance:
+          type: integer
+          description: 预计出勤人数
+          example: 45
+
+    # 课程实体（匹配 Course.java + 业务规则）
+    Course:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 课程ID（创建时无需传入，自动生成UUID）
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        code:
+          type: string
+          description: 课程代码（唯一）
+          example: "CS2024001"
+          maxLength: 20
+          minLength: 1
+        title:
+          type: string
+          description: 课程名称
+          example: "Spring Boot 实战开发"
+          maxLength: 100
+          minLength: 1
+        instructor:
+          $ref: '#/components/schemas/Instructor'
+          description: 授课讲师信息（嵌入式对象）
+        schedule:
+          $ref: '#/components/schemas/ScheduleSlot'
+          description: 排课信息（嵌入式对象）
+        capacity:
+          type: integer
+          description: 课程容量（必须大于0，且不能小于已选人数）
+          example: 50
+          minimum: 1
+        enrolled:
+          type: integer
+          description: 已选人数（创建/更新时无需传入，自动维护）
+          example: 32
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间（自动生成，无需传入）
+          example: "2024-09-01T10:30:00"
+      required:
+        - code
+        - title
+        - capacity
+
+    # 学生实体（匹配 Student.java + 业务规则）
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 学生ID（创建时无需传入，自动生成UUID）
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+        studentId:
+          type: string
+          description: 学号（唯一）
+          example: "20240001"
+          maxLength: 20
+          minLength: 1
+        name:
+          type: string
+          description: 学生姓名
+          example: "张三"
+          maxLength: 50
+          minLength: 1
+        major:
+          type: string
+          description: 专业
+          example: "计算机科学与技术"
+          maxLength: 100
+        grade:
+          type: integer
+          description: 年级
+          example: 2024
+          minimum: 2000
+          maximum: 2100
+        email:
+          type: string
+          description: 邮箱（唯一，格式需包含@）
+          example: "zhangsan@zjgsu.edu.cn"
+          maxLength: 100
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间（自动生成，无需传入）
+          example: "2024-09-01T14:20:00"
+      required:
+        - studentId
+        - name
+        - grade
+        - email
+
+    # 选课状态枚举（匹配 EnrollmentStatus.java）
+    EnrollmentStatus:
+      type: string
+      description: 选课状态
+      enum:
+        - ACTIVE
+        - DROPPED
+        - COMPLETED
+      example: "ACTIVE"
+
+    # 选课实体（匹配 Enrollment.java + 业务规则）
+    Enrollment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 选课记录ID（创建时无需传入，自动生成UUID）
+          example: "c2d3e4f5-6789-4ghi-0jkl-1234567890ab"
+        courseId:
+          type: string
+          description: 课程ID（必须存在）
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        studentId:
+          type: string
+          description: 学生ID（必须存在）
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+        status:
+          $ref: '#/components/schemas/EnrollmentStatus'
+          description: 选课状态（默认ACTIVE）
+        enrolledAt:
+          type: string
+          format: date-time
+          description: 选课时间（自动生成，无需传入）
+          example: "2024-09-02T09:15:00"
+      required:
+        - courseId
+        - studentId
+
+    # 选课请求参数（匹配 EnrollmentController.enroll 接收的 Map）
+    EnrollRequest:
+      type: object
+      properties:
+        courseId:
+          type: string
+          description: 课程ID
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        studentId:
+          type: string
+          description: 学生学号（注意：此处是studentId字段，非用户ID）
+          example: "20240001"
+      required:
+        - courseId
+        - studentId
+
+    # 数据库健康检查响应（匹配 HealthController）
+    DbHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: 服务状态（UP=正常，DOWN=异常）
+          example: "UP"
+        database:
+          type: string
+          description: 数据库连接状态
+          example: "Connected"
+        courseCount:
+          type: integer
+          description: 课程表记录数
+          example: 10
+        studentCount:
+          type: integer
+          description: 学生表记录数
+          example: 100
+        enrollmentCount:
+          type: integer
+          description: 选课表记录数
+          example: 320
+        error:
+          type: string
+          description: 错误信息（仅状态为DOWN时返回）
+          example: "Connection refused: connect"
+
+  responses:
+    # 通用响应模板
+    SuccessResponse:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          examples:
+            Success:
+              summary: 成功示例
+              value:
+                code: 200
+                message: "Success"
+                data: {}
+    NotFoundResponse:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          examples:
+            NotFound:
+              summary: 资源不存在示例
+              value:
+                code: 500
+                message: "Course not found with id: f47ac10b"
+                data: null
+    ConflictResponse:
+      description: 业务冲突（重复、容量不足等）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          examples:
+            Conflict:
+              summary: 业务冲突示例
+              value:
+                code: 500
+                message: "Course code already exists: CS2024001"
+                data: null
+    ValidationResponse:
+      description: 参数验证失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          examples:
+            ValidationError:
+              summary: 参数验证失败示例
+              value:
+                code: 500
+                message: "Invalid email format"
+                data: null
+
+paths:
+  # 课程管理接口（匹配 CourseController）
+  /api/courses:
+    get:
+      summary: 获取所有课程
+      description: 查询系统中所有课程的完整信息
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                CourseList:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                        code: "CS2024001"
+                        title: "Spring Boot 实战开发"
+                        instructor:
+                          id: "INS001"
+                          name: "李教授"
+                          email: "li@zjgsu.edu.cn"
+                        schedule:
+                          dayOfWeek: "Monday"
+                          startTime: "09:00"
+                          endTime: "11:30"
+                          expectedAttendance: 45
+                        capacity: 50
+                        enrolled: 32
+                        createdAt: "2024-09-01T10:30:00"
+    post:
+      summary: 创建新课程
+      description: 新增课程（课程代码唯一，容量必须大于0）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Course'
+            examples:
+              CreateCourseExample:
+                summary: 创建课程示例
+                value:
+                  code: "CS2024002"
+                  title: "微服务架构设计"
+                  instructor:
+                    id: "INS002"
+                    name: "王教授"
+                    email: "wang@zjgsu.edu.cn"
+                  schedule:
+                    dayOfWeek: "Wednesday"
+                    startTime: "14:00"
+                    endTime: "16:30"
+                    expectedAttendance: 40
+                  capacity: 45
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/ValidationResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+
+  /api/courses/{id}:
+    get:
+      summary: 根据ID查询课程
+      description: 通过课程ID获取单个课程的详细信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+    put:
+      summary: 根据ID更新课程
+      description: 更新课程信息（课程代码唯一，容量不能小于已选人数）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Course'
+            examples:
+              UpdateCourseExample:
+                value:
+                  code: "CS2024001"
+                  title: "Spring Boot 实战开发（2024秋）"
+                  instructor:
+                    id: "INS001"
+                    name: "李教授"
+                    email: "li_new@zjgsu.edu.cn"
+                  schedule:
+                    dayOfWeek: "Monday"
+                    startTime: "09:30"
+                    endTime: "12:00"
+                    expectedAttendance: 45
+                  capacity: 55
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+    delete:
+      summary: 根据ID删除课程
+      description: 删除指定ID的课程（需确保课程存在）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+
+  # 学生管理接口（匹配 StudentController）
+  /api/students:
+    get:
+      summary: 获取所有学生
+      description: 查询系统中所有学生的完整信息
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                StudentList:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - id: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+                        studentId: "20240001"
+                        name: "张三"
+                        major: "计算机科学与技术"
+                        grade: 2024
+                        email: "zhangsan@zjgsu.edu.cn"
+                        createdAt: "2024-09-01T14:20:00"
+    post:
+      summary: 创建新学生
+      description: 新增学生（学号、邮箱唯一，邮箱格式需合法）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Student'
+            examples:
+              CreateStudentExample:
+                value:
+                  studentId: "20240002"
+                  name: "李四"
+                  major: "软件工程"
+                  grade: 2024
+                  email: "lisi@zjgsu.edu.cn"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/ValidationResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+
+  /api/students/{id}:
+    get:
+      summary: 根据ID查询学生
+      description: 通过学生ID获取单个学生的详细信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+    put:
+      summary: 根据ID更新学生
+      description: 更新学生信息（学号、邮箱唯一，邮箱格式需合法）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Student'
+            examples:
+              UpdateStudentExample:
+                value:
+                  studentId: "20240001"
+                  name: "张三"
+                  major: "计算机科学与技术（人工智能方向）"
+                  grade: 2024
+                  email: "zhangsan_ai@zjgsu.edu.cn"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+    delete:
+      summary: 根据ID删除学生
+      description: 删除指定ID的学生（需确保无活跃选课记录）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+
+  # 选课管理接口（匹配 EnrollmentController）
+  /api/enrollments:
+    get:
+      summary: 获取所有选课记录
+      description: 查询系统中所有学生的选课记录
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                EnrollmentList:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - id: "c2d3e4f5-6789-4ghi-0jkl-1234567890ab"
+                        courseId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                        studentId: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+                        status: "ACTIVE"
+                        enrolledAt: "2024-09-02T09:15:00"
+    post:
+      summary: 学生选课
+      description: 学生选择课程（需课程存在、学生存在、未重复选课、课程有剩余容量）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRequest'
+            examples:
+              EnrollExample:
+                value:
+                  courseId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                  studentId: "20240001"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+        '409':
+          $ref: '#/components/responses/ConflictResponse'
+
+  /api/enrollments/course/{courseId}:
+    get:
+      summary: 根据课程ID查询选课记录
+      description: 查询指定课程的所有选课学生记录
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+
+  /api/enrollments/student/{studentId}:
+    get:
+      summary: 根据学生ID查询选课记录
+      description: 查询指定学生的所有选课记录
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "a1b2c3d4-5678-4abc-9def-0123456789ab"
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundResponse'
+
+  # 数据库健康检查接口（匹配 HealthController）
+  /health/db:
+    get:
+      summary: 数据库健康检查
+      description: 验证数据库连接状态及各表记录数（作业要求必测接口）
+      responses:
+        '200':
+          description: 数据库连接正常
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                HealthUp:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      status: "UP"
+                      database: "Connected"
+                      courseCount: 10
+                      studentCount: 100
+                      enrollmentCount: 320
+        '500':
+          description: 数据库连接失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                HealthDown:
+                  value:
+                    code: 500
+                    message: "Database health check failed"
+                    data:
+                      status: "DOWN"
+                      database: "Connection failed"
+                      error: "Connection refused: connect"
